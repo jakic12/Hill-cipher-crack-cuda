@@ -2,16 +2,46 @@
 #include <math.h>
 #include <string>
 
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess) 
+   {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
 __device__
 void to_base_N(int N, int num, int* out, int size){
     int i = 0;
     while(num > 0){
-        if (i >= size){ // TODO: fill with zeroes
-            return;
+        if (i >= size){
+            break;
         }
         out[i] = num % N;
         num = num / N;
         i++;
+    }
+    // fill with zeroes
+    for(; i < size; i++){
+        out[i] = 0;
+    }
+}
+
+void to_base_N_cpu(int N, int num, int* out, int size){
+    int i = 0;
+    while(num > 0){
+        if (i >= size){
+            break;
+        }
+        out[i] = num % N;
+        num = num / N;
+        i++;
+    }
+    // fill with zeroes
+    for(; i < size; i++){
+        out[i] = 0;
     }
 }
 
@@ -87,23 +117,32 @@ void get_chi_squared_for_all(
 
             // multiply the vector with the block
             for(int l = 0; l < k; l++){
+                //printf("c:%d, converted:%d\n, vec[l]: %d\n", cypher[j+l], (cypher[j+l] - 'a'), vec[l]);
                 sum += (cypher[j+l] - 'a') * vec[l];
             }
             sum %= 26;
 
             // add to the frequency
-            ++freq[sum];
+            freq[sum]++;
         }
+        
+        // print freq
+        /*if(vec[0] == 15 && vec[1] == 18){
+            for(int j = 0; j < 26; j++){
+                printf("%d-%d:%d\n",i, j, freq[j]);
+            }
+        }*/
 
         // calculate chi squared
         for(int j = 0; j < 26; j++){
-            chi_squared[i] += (freq[j] - dist[j])*(freq[j] - dist[j])/dist[j];
+            float dst = dist[j]/100.0f * N;
+            chi_squared[i] += (freq[j] - dst)*(freq[j] - dst)/dst;
         }
+
+        //printf("[%d] chi squared done\n", i);
 
         delete[] vec;
         delete[] freq;
-
-        chi_squared[i] = 1;
     }
 
 }
@@ -124,6 +163,7 @@ void get_decrypted_permutations(
 ){
     int i = blockIdx.x*blockDim.x+threadIdx.x; // permutation id
     int j = blockIdx.y*blockDim.y+threadIdx.y; // block id (block in text)
+
     if (i < num_of_perms && j+k < N) {
 
         // get how the vectors are permuted in the permutation encoded as i
@@ -140,10 +180,10 @@ void get_decrypted_permutations(
             // multiply block with vector
             int chr = 0;
             for(int l = 0; l < k; l++){
-                chr += cypher[j+l] * vector[l];
+                chr += cypher[j*k+l] * vector[l];
             }
             chr = chr % 26;
-            decrypted[i*N + (j+m)] = chr;
+            decrypted[i*N + (j*k+m)] = chr + 'a';
         }
 
         delete[] idx_permutation;
@@ -153,7 +193,7 @@ void get_decrypted_permutations(
 
 int argmin(int* a, int size){
     int min = 0;
-    for(int i = 0; i < size; i++){
+    for(int i = 1; i < size; i++){
         if(a[i] < a[min]){
             min = i;
         }
@@ -161,27 +201,45 @@ int argmin(int* a, int size){
     return min;
 }
 
-int argmax(int* a, int size){
-    int min = 0;
-    for(int i = 0; i < size; i++){
-        if(a[i] > a[min]){
-            min = i;
+// search for the index of the max value in a
+// (ignore indexes not in indexes)
+int argmax_from_list_of_indexes(float* a, int* indexes, int idx_size){
+    int max = 0;
+    for(int i = 0; i < idx_size; i++){
+        int idx = indexes[i];
+        if(a[idx] > a[indexes[max]]){
+            max = i;
         }
     }
-    return min;
+    return max;
+}
+
+void print_arr(int* a, int size){
+    printf("[");
+    for(int i = 0; i < size; i++){
+        printf("%d ", a[i]);
+    }
+    printf("]\n");
+}
+
+void print_arrf(float* a, int size){
+    printf("[");
+    for(int i = 0; i < size; i++){
+        printf("%.2f ", a[i]);
+    }
+    printf("]\n");
 }
 
 void arg_smallest_k(float* a, int* out, int k, int a_size){
     for(int i = 0; i < k; i++){
-        out[i] = a[i];
+        out[i] = i;
     }
 
-    int max = argmax(out,k);
-
+    int max_idx = argmax_from_list_of_indexes(a, out, k);
     for(int i = k; i < a_size; i++){
-        if(a[i] < a[max]){
-            out[max] = i;
-            max = argmax(out,k);
+        if(a[i] < a[out[max_idx]]){
+            out[max_idx] = i;
+            max_idx = argmax_from_list_of_indexes(a, out, k);
         }
     }
 }
@@ -200,16 +258,20 @@ int main(void)
     std::getline(std::cin, line);
 
     // cypher encrypted with hill cipher
-    const char* cypher = line.c_str();
+    char* cypher;
     int N = line.length();
     cudaMallocManaged(&cypher, N*sizeof(float));
 
+    // copy the cypher to the gpu
+    for(int i = 0; i < N; i++){
+        cypher[i] = line[i];
+    }
     std::cout << "N:" << N << std::endl;
 
     int blockSize = 32;
 
     // k is the block size
-    for(int k = 2; k <= N; k++){
+    for(int k = 2; k <= 2; k++){
         // it doesn't make sense to parallelize this because you have to manually confirm
         // each decryption anyways
         if(N % k == 0){
@@ -224,8 +286,8 @@ int main(void)
                 exit(0);
             }
 
-            float* chi_squared = new float[num_of_vecs];
-            cudaMallocManaged(&chi_squared, num_of_vecs*sizeof(float));
+            float* chi_squared;
+            gpuErrchk( cudaMallocManaged(&chi_squared, num_of_vecs*sizeof(float)) );
             get_chi_squared_for_all<<<numBlocks, blockSize>>>(
                 cypher,
                 N,
@@ -235,25 +297,57 @@ int main(void)
             );
 
             // wait for the kernel to finish
-            cudaDeviceSynchronize();
+            gpuErrchk( cudaPeekAtLastError() );
+            gpuErrchk( cudaDeviceSynchronize() );
 
             std::cout << "(" << num_of_vecs << "):";
+
+            int* vec = new int[k];
+            // each number represents a row vector, so this is the decoder matrix
+
             for(int i = 0; i < num_of_vecs; i++){
-                std::cout << chi_squared[i] << " ";
+                to_base_N_cpu(26, i, vec, k);
+                std::cout << i << '[';
+                for(int j = 0; j < k; j++){
+                    std::cout << vec[j] << ", ";
+                }
+                std::cout<< "]:";
+                std::cout << chi_squared[i] << std::endl;
             }
             std::cout << std::endl;
 
             std::cout << "done calculating chi" << std::endl;
 
-            // each number represents a row vector, so this is the decoder matrix
-            int* smallest_k = new int[k];
-            arg_smallest_k(chi_squared, smallest_k, k, num_of_vecs);
+            int* smallest_k_cpu = new int[k];
+            arg_smallest_k(chi_squared, smallest_k_cpu, k, num_of_vecs);
+
+            std::cout << "smallest k:[";
+            for(int i = 0; i < k; i++){
+                std::cout << smallest_k_cpu[i] << " ";
+            }
+            std::cout << "]" << std::endl;
+
+            for(int i = 0; i < k; i++){
+                int vec_i = smallest_k_cpu[i];
+                to_base_N_cpu(26, vec_i, vec, k);
+                std::cout << vec_i << '[';
+                for(int j = 0; j < k; j++){
+                    std::cout << vec[j] << ", ";
+                }
+                std::cout << "]:";
+                std::cout << chi_squared[vec_i] << std::endl;
+            }
+
+            int* smallest_k;
             cudaMallocManaged(&smallest_k, k*sizeof(int));
 
+            for(int i = 0; i < k; i++){
+                smallest_k[i] = smallest_k_cpu[i];
+            }
 
             int num_of_perms = factorial(k);
-            char* decyphered = new char[num_of_perms*N];
-            cudaMallocManaged(&decyphered, k*sizeof(char));
+            char* deciphered;
+            cudaMallocManaged(&deciphered, num_of_perms*N*sizeof(char));
 
             // calculate how many cuda threads and blocks to spawn
             dim3 dimBlock(num_of_perms, N/k); // so your threads are BLOCK_SIZE*BLOCK_SIZE, 256 in this case
@@ -265,7 +359,7 @@ int main(void)
                 k,
                 num_of_perms,
                 smallest_k,
-                decyphered
+                deciphered
             );
 
             cudaDeviceSynchronize();
@@ -273,12 +367,12 @@ int main(void)
             for(int o = 0; o < num_of_perms; o++){
                 std::cout << o << ": ";
                 for(int r = 0; r < N; r++){
-                    std::cout << decyphered[o*N + r];
+                    std::cout << deciphered[o*N + r];
                 }
                 std::cout << std::endl;
             }
 
-            cudaFree(decyphered);
+            cudaFree(deciphered);
             cudaFree(chi_squared);
         }
     }
