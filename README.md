@@ -209,6 +209,7 @@ block_size:151
 number of vectors to check: -2147483648
 Overflow in number of vectors
 ```
+Iz izhoda programa vidimo, da pri block size 2 in permutaciji 0 dobimo angleški tekst. Tekstu morami ročno dodati presledke: ```cryptography prior to the modern age was effectively synonymous with encryption the conversion of information from...```
 
 # Performance
 Ker imam prenosnik brez grafične kartice, sem moral testirati z google collab, torej je performance slabši.  
