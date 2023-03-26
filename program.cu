@@ -94,7 +94,7 @@ __global__
 void get_chi_squared_for_all(
     const char* cypher, // the cypher
     int N, // length of the cypher
-    int k, // size of the bruteforced vector
+    int block_size, // size of the bruteforced vector
     int num_of_vecs, // number of vectors to test
     float* chi_squared // the out chi squared values
 ){
@@ -106,17 +106,18 @@ void get_chi_squared_for_all(
     // cuda will run more threads than we need
     if (i < num_of_vecs) {
         // get vector that is being tested
-        int* vec = new int[k];
-        to_base_N(26, i, vec, k);
+        int* vec = new int[block_size];
+        to_base_N(26, i, vec, block_size);
 
         chi_squared[i] = 0.0f;
         int* freq = new int[26];
+        int out_length = 0;
 
-        for(int j = 0; j < N; j += k){
+        for(int j = 0; j < N; j += block_size){
             int sum = 0;
 
             // multiply the vector with the block
-            for(int l = 0; l < k; l++){
+            for(int l = 0; l < block_size; l++){
                 //printf("c:%d, converted:%d\n, vec[l]: %d\n", cypher[j+l], (cypher[j+l] - 'a'), vec[l]);
                 sum += (cypher[j+l] - 'a') * vec[l];
             }
@@ -124,19 +125,12 @@ void get_chi_squared_for_all(
 
             // add to the frequency
             freq[sum]++;
+            out_length++;
         }
-        
-        // print freq
-        /*if(vec[0] == 15 && vec[1] == 18){
-            for(int j = 0; j < 26; j++){
-                printf("%d-%d:%d\n",i, j, freq[j]);
-            }
-        }*/
-
         // calculate chi squared
         for(int j = 0; j < 26; j++){
-            float dst = dist[j]/100.0f * N;
-            chi_squared[i] += (freq[j] - dst)*(freq[j] - dst)/dst;
+            float expected = dist[j]/100.0f * out_length;
+            chi_squared[i] += (freq[j] - expected)*(freq[j] - expected)/expected;
         }
 
         //printf("[%d] chi squared done\n", i);
@@ -156,7 +150,7 @@ __global__
 void get_decrypted_permutations(
     const char* cypher, // the cypher
     int N, // length of the cypher
-    int k, // size of the matrix
+    int block_size, // size of the matrix
     int num_of_perms, // number of permutations
     int* vectors, // the vectors to test permutations of (vector of numbers)
     char* decrypted // the out decrypted cypher (flattened matrix)
@@ -164,26 +158,26 @@ void get_decrypted_permutations(
     int i = blockIdx.x*blockDim.x+threadIdx.x; // permutation id
     int j = blockIdx.y*blockDim.y+threadIdx.y; // block id (block in text)
 
-    if (i < num_of_perms && j+k < N) {
+    if (i < num_of_perms && j+block_size < N) {
 
         // get how the vectors are permuted in the permutation encoded as i
         // (array of indexes)
-        int* idx_permutation = new int[k];
-        base_factorial_to_perm(i, idx_permutation, k);
+        int* idx_permutation = new int[block_size];
+        base_factorial_to_perm(i, idx_permutation, block_size);
 
         // for each letter in the current block to decypher
-        int* vector = new int[k];
-        for(int m = 0; m < k; m++){
+        int* vector = new int[block_size];
+        for(int m = 0; m < block_size; m++){
             // convert from number to vector
-            to_base_N(26, vectors[idx_permutation[m]], vector, k);
+            to_base_N(26, vectors[idx_permutation[m]], vector, block_size);
 
             // multiply block with vector
             int chr = 0;
-            for(int l = 0; l < k; l++){
-                chr += (cypher[j*k+l] - 'a') * vector[l];
+            for(int l = 0; l < block_size; l++){
+                chr += (cypher[j*block_size+l] - 'a') * vector[l];
             }
             chr = chr % 26;
-            decrypted[i*N + (j*k+m)] = chr + 'a';
+            decrypted[i*N + (j*block_size+m)] = chr + 'a';
         }
 
         delete[] idx_permutation;
@@ -230,6 +224,7 @@ void print_arrf(float* a, int size){
     printf("]\n");
 }
 
+// get indexes of smallest k elements in the a array
 void arg_smallest_k(float* a, int* out, int k, int a_size){
     for(int i = 0; i < k; i++){
         out[i] = i;
@@ -268,17 +263,14 @@ int main(void)
     }
     std::cout << "N:" << N << std::endl;
 
-    int blockSize = 32;
+    int gpu_grid_block_size = 32;
 
-    // k is the block size
-    for(int k = 2; k <= 2; k++){
-        // it doesn't make sense to parallelize this because you have to manually confirm
-        // each decryption anyways
-        if(N % k == 0){
-            int num_of_vecs = pow(26,k);
-            int numBlocks = get_num_blocks(blockSize, num_of_vecs);
+    for(int block_size = 2; block_size <= N; block_size++){
+        if(N % block_size == 0){
+            int num_of_vecs = pow(26,block_size);
+            int numBlocks = get_num_blocks(gpu_grid_block_size, num_of_vecs);
 
-            std::cout << "k:" << k << std::endl << "number of vectors to check: " << num_of_vecs << std::endl;
+            std::cout << "block_size:" << block_size << std::endl << "number of vectors to check: " << num_of_vecs << std::endl;
 
             // allocate memory for the chi squared values
             if (num_of_vecs < 0) {
@@ -288,10 +280,10 @@ int main(void)
 
             float* chi_squared;
             gpuErrchk( cudaMallocManaged(&chi_squared, num_of_vecs*sizeof(float)) );
-            get_chi_squared_for_all<<<numBlocks, blockSize>>>(
+            get_chi_squared_for_all<<<numBlocks, gpu_grid_block_size>>>(
                 cypher,
                 N,
-                k, 
+                block_size, 
                 num_of_vecs,
                 chi_squared
             );
@@ -302,36 +294,36 @@ int main(void)
 
             std::cout << "(" << num_of_vecs << "):";
 
-            int* vec = new int[k];
+            int* vec = new int[block_size];
             // each number represents a row vector, so this is the decoder matrix
 
-            for(int i = 0; i < num_of_vecs; i++){
-                to_base_N_cpu(26, i, vec, k);
+            /*for(int i = 0; i < num_of_vecs; i++){
+                to_base_N_cpu(26, i, vec, block_size);
                 std::cout << i << '[';
-                for(int j = 0; j < k; j++){
+                for(int j = 0; j < block_size; j++){
                     std::cout << vec[j] << ", ";
                 }
                 std::cout<< "]:";
                 std::cout << chi_squared[i] << std::endl;
             }
-            std::cout << std::endl;
+            std::cout << std::endl;*/
 
             std::cout << "done calculating chi" << std::endl;
 
-            int* smallest_k_cpu = new int[k];
-            arg_smallest_k(chi_squared, smallest_k_cpu, k, num_of_vecs);
+            int* smallest_k_cpu = new int[block_size];
+            arg_smallest_k(chi_squared, smallest_k_cpu, block_size, num_of_vecs);
 
-            std::cout << "smallest k:[";
-            for(int i = 0; i < k; i++){
+            std::cout << "smallest block_size:[";
+            for(int i = 0; i < block_size; i++){
                 std::cout << smallest_k_cpu[i] << " ";
             }
             std::cout << "]" << std::endl;
 
-            for(int i = 0; i < k; i++){
+            for(int i = 0; i < block_size; i++){
                 int vec_i = smallest_k_cpu[i];
-                to_base_N_cpu(26, vec_i, vec, k);
+                to_base_N_cpu(26, vec_i, vec, block_size);
                 std::cout << vec_i << '[';
-                for(int j = 0; j < k; j++){
+                for(int j = 0; j < block_size; j++){
                     std::cout << vec[j] << ", ";
                 }
                 std::cout << "]:";
@@ -339,24 +331,24 @@ int main(void)
             }
 
             int* smallest_k;
-            cudaMallocManaged(&smallest_k, k*sizeof(int));
+            cudaMallocManaged(&smallest_k, block_size*sizeof(int));
 
-            for(int i = 0; i < k; i++){
+            for(int i = 0; i < block_size; i++){
                 smallest_k[i] = smallest_k_cpu[i];
             }
 
-            int num_of_perms = factorial(k);
+            int num_of_perms = factorial(block_size);
             char* deciphered;
             cudaMallocManaged(&deciphered, num_of_perms*N*sizeof(char));
 
             // calculate how many cuda threads and blocks to spawn
-            dim3 dimBlock(num_of_perms, N/k); // so your threads are BLOCK_SIZE*BLOCK_SIZE, 256 in this case
+            dim3 dimBlock(num_of_perms, N/block_size); // so your threads are BLOCK_SIZE*BLOCK_SIZE, 256 in this case
             dim3 dimGrid(1, 1); // 1*1 blocks in a grid
 
             get_decrypted_permutations<<<dimGrid, dimBlock>>>(
                 cypher,
                 N,
-                k,
+                block_size,
                 num_of_perms,
                 smallest_k,
                 deciphered
