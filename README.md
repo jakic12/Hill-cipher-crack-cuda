@@ -1,6 +1,8 @@
 # Hill-cypher-crack-cuda
-Jakob Drusany
-63200005
+Jakob Drusany  
+63200005  
+  
+Tehnične konzultacije za `C++`: Yon Ploj
 
 # Uporaba programa
 Program je potrebno prevesti z compiler driverjem `nvcc`.
