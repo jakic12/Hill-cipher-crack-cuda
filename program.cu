@@ -175,12 +175,12 @@ void get_decrypted_permutations(
         int* vector = new int[k];
         for(int m = 0; m < k; m++){
             // convert from number to vector
-            to_base_N(26, idx_permutation[m], vector, k);
+            to_base_N(26, vectors[idx_permutation[m]], vector, k);
 
             // multiply block with vector
             int chr = 0;
             for(int l = 0; l < k; l++){
-                chr += cypher[j*k+l] * vector[l];
+                chr += (cypher[j*k+l] - 'a') * vector[l];
             }
             chr = chr % 26;
             decrypted[i*N + (j*k+m)] = chr + 'a';
