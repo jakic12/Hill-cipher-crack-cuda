@@ -1,4 +1,9 @@
 # Hill-cypher-crack-cuda
+Jakob Drusany
+63200005
+
+# teoretična razlaga
+Hillova šifra zakodira tekst z uporabo matričnega množenja vsakega bloka. Če je velikost bloka `k`, je vsaka `k`-ta črka torej odvisna samo od prve vrstice enkripcijske matrike. Izkaže se, da je vsaka `k`-ta črka porazdeljena po enaki porazdelitvi kot vse črke. Ker to razdelitev poznamo, lahko dešifriramo vsako `k`-to črko in dobljeno porazdelitev primirjamo z že vnaprej poznano. Za razdaljo med porazdelitvami uporabimo chi kvadrat. Torej moramo iterirati skozi vse možne dekripcijske vektorje dolžine `k` (vsak element je lahko ena izmed 26 črk) in vsakega ocenit s chi kvadrat. Vzamemo najboljših `k` in poskusimo dekriptirati tekst z matrikami vseh možnih permutacij teh vektorjev. Na koncu moramo dekriptiran tekst ročno preveriti, če je pravilno dekriptirano.
 
 
 # Izpis programa
