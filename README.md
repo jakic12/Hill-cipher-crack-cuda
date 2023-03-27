@@ -22,7 +22,7 @@ Zdelo se mi je, da se da problem precej dobro paralelizirati in sem ga zato impl
 Glavni del programa je ločen v dva koraka:  
 ## 1. korak: izracunaj vse mozne vektorje dolzine `k` in jih oceni s chi kvadrat
 Funkcija, ki se izvaja na grafičnem procesorju se imenuje kernel in jo je potrebno definirati s predpono `__global__`. To funkcijo lahko potem kličemo s posebno sintakso, da grafični procesor zažene veliko število instanc na enkrat. Primer `function<<10,32>>(arg1)`, bo pognal funkcijo `10*32` krat. Vsaka instanca se kliče s svojim indeksom. Ta indeks si lahko predstavljamo kot iterator.  
-Torej v prvem koraku moram iterirati skozi vse možne vektorje dolžine `k`. Ker je iterator vedno samo število, se moral iz množice `k^26` števil nekako preslikati v vse možne vektorje dolžine `k`. To sem dosegel, da sem iterator (`i`) pretvoril v bazo 26 in ga shranil v `vec`.
+Torej v prvem koraku moram iterirati skozi vse možne vektorje dolžine `k`. Ker je iterator vedno samo število, se moral iz množice `26^k` števil nekako preslikati v vse možne vektorje dolžine `k`. To sem dosegel, da sem iterator (`i`) pretvoril v bazo 26 in ga shranil v `vec`.
 
 ```c
 __global__
