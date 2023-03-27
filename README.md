@@ -222,7 +222,7 @@ Najprej velikost 2 (vse skupaj <b>`4.7452ms`</b>):
  * Za izračun chi kvadrat vseh možnih vektorjev dolžine 2 (676), je program potreboval <b>`1.8745ms`</b>  
  * Za dekripcijo kriptograma z vsemi možnimi permutacijami (2), je program potreboval <b>`2.8707ms`</b>  
  
-Za velikost 4 (vse skupaj <b>`352.7356`</b>):
+Za velikost 4 (vse skupaj <b>`352.7356ms`</b>):
  * Za izračun chi kvadrat vseh možnih vektorjev dolžine 4 (456976), je program potreboval <b>`346.07ms`</b>  
  * Za dekripcijo kriptograma z vsemi možnimi permutacijami (24), je program potreboval <b>`6.6656ms`</b>  
  
