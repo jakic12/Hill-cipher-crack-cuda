@@ -76,8 +76,6 @@ Na koncu sem še izračunal chi kvadrat med dobljeno porazdelitvijo in pričakov
             chi_squared[i] += (freq[j] - expected)*(freq[j] - expected)/expected;
         }
 
-        //printf("[%d] chi squared done\n", i);
-
         delete[] vec;
         delete[] freq;
     }
