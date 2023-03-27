@@ -158,7 +158,7 @@ void get_decrypted_permutations(
     int i = blockIdx.x*blockDim.x+threadIdx.x; // permutation id
     int j = blockIdx.y*blockDim.y+threadIdx.y; // block id (block in text)
 
-    if (i < num_of_perms && j+block_size < N) {
+    if (i < num_of_perms && j*block_size < N) {
 
         // get how the vectors are permuted in the permutation encoded as i
         // (array of indexes)
@@ -259,7 +259,13 @@ int main(void)
 
     // copy the cypher to the gpu
     for(int i = 0; i < N; i++){
-        cypher[i] = line[i];
+        if(line[i] <= 'z' && line[i] >= 'a'){
+          cypher[i] = line[i];
+        } else if(line[i] <= 'Z' && line[i] >= 'A'){
+          cypher[i] = line[i] - 'A' + 'a';
+        } else {
+          cypher[i] = 'X';
+        }
     }
     std::cout << "N:" << N << std::endl;
 
@@ -342,8 +348,10 @@ int main(void)
             cudaMallocManaged(&deciphered, num_of_perms*N*sizeof(char));
 
             // calculate how many cuda threads and blocks to spawn
-            dim3 dimBlock(num_of_perms, N/block_size); // so your threads are BLOCK_SIZE*BLOCK_SIZE, 256 in this case
-            dim3 dimGrid(1, 1); // 1*1 blocks in a grid
+            int num_blocks_2dimx = get_num_blocks(gpu_grid_block_size, num_of_perms);
+            int num_blocks_2dimy = get_num_blocks(gpu_grid_block_size, N/block_size);
+            dim3 dimBlock(gpu_grid_block_size, gpu_grid_block_size); // so your threads are BLOCK_SIZE*BLOCK_SIZE, 256 in this case
+            dim3 dimGrid(num_blocks_2dimx, num_blocks_2dimy); // 1*1 blocks in a grid
 
             get_decrypted_permutations<<<dimGrid, dimBlock>>>(
                 cypher,
