@@ -218,13 +218,20 @@ Kriptogram iz eucilnice (dolzine 676)
                     2.67%  9.5363ms         2  4.7682ms  2.8707ms  6.6656ms  get_decrypted_permutations(...
 ```
 Program je testiral različne dolžine dekripcijskega ključa.  
-Najprej velikost 2 (vse skupaj <b>`4.7452ms`</b>):  
+Najprej velikost 2 (vse skupaj na grafičnem procesorju <b>`4.7452ms`</b>):  
  * Za izračun chi kvadrat vseh možnih vektorjev dolžine 2 (676), je program potreboval <b>`1.8745ms`</b>  
  * Za dekripcijo kriptograma z vsemi možnimi permutacijami (2), je program potreboval <b>`2.8707ms`</b>  
  
-Za velikost 4 (vse skupaj <b>`352.7356ms`</b>):
+Za velikost 4 (vse skupaj na grafičnem procesorju <b>`352.7356ms`</b>):
  * Za izračun chi kvadrat vseh možnih vektorjev dolžine 4 (456976), je program potreboval <b>`346.07ms`</b>  
  * Za dekripcijo kriptograma z vsemi možnimi permutacijami (24), je program potreboval <b>`6.6656ms`</b>  
+ 
+Cel program je potreboval `0.847s`
+ ```
+real	0m0.847s
+user	0m0.449s
+sys   0m0.242s
+```
  
 ## Večji primer
 Kriptogram dolžine 1450, zašifriran z ključem dolžine 5
@@ -233,9 +240,16 @@ Kriptogram dolžine 1450, zašifriran z ključem dolžine 5
  GPU activities:   98.99%  4.14039s         2  2.07019s  2.1595ms  4.13823s  get_chi_squared_for_all(cha...
                     1.01%  42.451ms         2  21.225ms  5.6102ms  36.840ms  get_decrypted_permutations(...
 ```
-Za velikost 5 (vse skupaj <b>`~4s`</b>):
+Za velikost 5 (vse skupaj na grafičnem procesorju <b>`~4s`</b>):
  * Za izračun chi kvadrat vseh možnih vektorjev dolžine 4 (11881376), je program potreboval <b>`4.13823s`</b>  
  * Za dekripcijo kriptograma z vsemi možnimi permutacijami (120), je program potreboval <b>`36.840ms`</b>
+ 
+Cel program je potreboval `4.564s`
+```
+real	0m4.564s
+user	0m4.251s
+sys	  0m0.249s
+```
 
 # Zaključek
 Zdi se mi, da je problem precej dobro paralelizabilen in sem veliko pridobil na hitrosti zaradi implementacije na grafičnem procesorju.
