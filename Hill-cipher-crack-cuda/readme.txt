@@ -1,0 +1,1 @@
+Poročilo je lepše berljivo na repozitoriju: https://github.com/jakic12/Hill-cipher-crack-cuda
