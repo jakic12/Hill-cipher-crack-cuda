@@ -1,4 +1,4 @@
-# Hill-cypher-crack-cuda
+# Crack geffe
 
 Jakob Drusany  
 63200005
